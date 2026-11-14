@@ -1,1 +1,49 @@
+name: Build APK
 
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: تحميل المشروع
+        uses: actions/checkout@v4
+
+      - name: إعداد Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: إعداد Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: إعداد Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: تثبيت الحزم
+        run: npm install
+
+      - name: إنشاء مشروع Android (إن لم يكن موجوداً)
+        run: |
+          if [ ! -d android ]; then npx cap add android; fi
+
+      - name: مزامنة الملفات مع Android
+        run: npx cap sync android
+
+      - name: بناء ملف APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: رفع ملف APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: notes-app-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
