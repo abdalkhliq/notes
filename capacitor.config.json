@@ -1,0 +1,6 @@
+{
+  "appId": "com.yas.notes",
+  "appName": "برنامج الملاحظات",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
