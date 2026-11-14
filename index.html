@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>برنامج الملاحظات</title>
+<style>
+  /* ===== الثيمات ===== */
+  :root, [data-theme="light"] {
+    --bg: #f4f6f9; --surface: #ffffff; --text: #222222; --muted: #888888;
+    --accent: #27ae60; --accent-hover: #219a52; --title: #2c3e50;
+    --border: #cccccc; --shadow: rgba(0,0,0,0.08);
+  }
+  [data-theme="dark"] {
+    --bg: #1e1f24; --surface: #2a2c33; --text: #e6e6e6; --muted: #9a9ea8;
+    --accent: #3fb97a; --accent-hover: #34a06a; --title: #8ab4f8;
+    --border: #4a4d57; --shadow: rgba(0,0,0,0.4);
+  }
+  [data-theme="sepia"] {
+    --bg: #f3ead8; --surface: #fbf5e9; --text: #4a3b2a; --muted: #8c7a63;
+    --accent: #a0522d; --accent-hover: #8b4522; --title: #6b4a2b;
+    --border: #cbb995; --shadow: rgba(80,50,20,0.15);
+  }
+  [data-theme="blue"] {
+    --bg: #e8f1fb; --surface: #ffffff; --text: #1d2b3a; --muted: #6f8196;
+    --accent: #2f80ed; --accent-hover: #1f6ad1; --title: #1b4f8a;
+    --border: #b5cce8; --shadow: rgba(30,80,150,0.12);
+  }
+
+  /* ===== أوراق الملاحظات ===== */
+  .paper-plain { background-color: var(--surface); }
+  .paper-lined {
+    background-color: var(--surface);
+    background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 27px, #b9c7d8 27px, #b9c7d8 28px);
+    background-attachment: local;
+  }
+  .paper-grid {
+    background-color: var(--surface);
+    background-image:
+      linear-gradient(#c9d3df 1px, transparent 1px),
+      linear-gradient(90deg, #c9d3df 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .paper-dotted {
+    background-color: var(--surface);
+    background-image: radial-gradient(#b5b5b5 1px, transparent 1.2px);
+    background-size: 20px 20px;
+  }
+
+  /* ===== التصميم العام ===== */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 20px 20px 120px;
+    transition: background 0.3s, color 0.3s;
+  }
+  .container { max-width: 1000px; margin: 0 auto; }
+  h1 { text-align: center; color: var(--title); margin-bottom: 20px; }
+
+  .toolbar {
+    background: var(--surface); border-radius: 12px; padding: 12px 14px;
+    box-shadow: 0 2px 6px var(--shadow); margin-bottom: 14px;
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  }
+  .tool-label { font-size: 14px; color: var(--muted); font-weight: bold; }
+  .theme-select {
+    padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--text);
+    font-family: inherit; font-size: 14px; cursor: pointer;
+  }
+  .tool-btn {
+    padding: 8px 14px; border: none; border-radius: 8px; cursor: pointer;
+    font-family: inherit; font-size: 14px; color: #fff; background: #d68910;
+  }
+  .tool-btn:hover { background: #b9770e; }
+  .tool-btn.active { background: #2f80ed; }
+
+  .crumb {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    font-size: 14px; color: var(--muted); margin-bottom: 12px; min-height: 30px;
+  }
+  .crumb strong { color: var(--title); }
+  .chip {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    padding: 5px 12px; border-radius: 16px; cursor: pointer;
+    font-family: inherit; font-size: 13px;
+  }
+
+  .search-box {
+    width: 100%; padding: 12px 14px; border: 1px solid var(--border);
+    border-radius: 10px; font-size: 16px; font-family: inherit;
+    background: var(--surface); color: var(--text); margin-bottom: 16px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+  .file-card {
+    border-radius: 8px; padding: 10px 8px;
+    box-shadow: 0 1px 3px var(--shadow); border: 1px solid var(--border);
+    text-align: center; cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    position: relative; display: flex; flex-direction: column;
+    align-items: center; min-height: 110px;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  }
+  .file-card:hover { transform: translateY(-2px); box-shadow: 0 4px 10px var(--shadow); }
+  .file-card.selected { outline: 3px solid var(--accent); outline-offset: 1px; }
+  .check {
+    position: absolute; top: 4px; right: 4px; width: 20px; height: 20px;
+    border-radius: 50%; background: var(--accent); color: #fff;
+    font-size: 12px; line-height: 20px; text-align: center; display: none;
+  }
+  .file-card.selected .check { display: block; }
+  .file-icon {
+    height: 60px; margin-bottom: 8px; display: flex;
+    align-items: center; justify-content: center; perspective: 400px;
+    color: var(--accent);
+  }
+  .file-icon svg {
+    width: 40px; height: 48px;
+    transform: rotateY(-20deg) rotateX(10deg);
+    transform-style: preserve-3d;
+    filter:
+      drop-shadow(1px 1px 0 rgba(0,0,0,0.15))
+      drop-shadow(3px 4px 2px rgba(0,0,0,0.25))
+      drop-shadow(0 10px 12px var(--shadow));
+    transition: transform 0.35s ease;
+  }
+  .file-icon svg path:first-child { fill-opacity: 0.35; }
+  .file-card:hover .file-icon svg { transform: rotateY(0deg) rotateX(0deg) translateY(-4px); }
+  .folder-icon { color: #e6a23c; }
+  .folder-icon svg { width: 52px; height: 42px; }
+  .file-name {
+    font-weight: bold; color: var(--title); font-size: 12px;
+    word-break: break-word; margin-bottom: 4px; line-height: 1.3;
+  }
+  .file-preview {
+    font-size: 11px; color: var(--text); line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; margin-bottom: 4px;
+  }
+  .file-date { font-size: 10px; color: var(--muted); margin-top: auto; }
+  .file-delete {
+    position: absolute; top: 2px; left: 3px; background: none; border: none;
+    font-size: 11px; cursor: pointer; opacity: 0.5; color: var(--text);
+  }
+  .file-delete:hover { opacity: 1; }
+  .empty { text-align: center; color: var(--muted); padding: 40px; grid-column: 1 / -1; }
+
+  .fab {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    width: 60px; height: 60px; border-radius: 50%; border: none;
+    background: var(--accent); color: #fff; font-size: 32px; line-height: 60px;
+    text-align: center; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
+  .fab:hover { background: var(--accent-hover); }
+  .fab.hidden { display: none; }
+
+  /* شريط الإجراءات عند التحديد */
+  .action-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 12px var(--shadow);
+    padding: 12px 16px; display: none; align-items: center;
+    justify-content: center; gap: 10px; flex-wrap: wrap; z-index: 5;
+  }
+  .action-bar.show { display: flex; }
+  .action-count { font-weight: bold; color: var(--title); margin-left: 8px; }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    display: none; align-items: center; justify-content: center;
+    padding: 16px; z-index: 10;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background-color: var(--surface); color: var(--text);
+    border-radius: 12px; padding: 20px; width: 100%; max-width: 520px;
+  }
+  .file-header {
+    display: flex; align-items: center; gap: 8px;
+    margin: -20px -20px 14px; padding: 12px 16px;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    border-radius: 12px 12px 0 0; font-weight: bold; color: var(--title);
+  }
+  .file-header-icon { font-size: 20px; }
+  .modal input {
+    width: 100%; padding: 10px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 16px; font-family: inherit; direction: rtl;
+    margin-bottom: 10px; background-color: var(--surface); color: var(--text);
+  }
+  .modal textarea {
+    width: 100%; padding: 10px; border: 1px solid var(--border);
+    border-radius: 6px; font-size: 16px; font-family: inherit; direction: rtl;
+    margin-bottom: 10px; color: var(--text); min-height: 180px;
+    resize: vertical; line-height: 28px; background-origin: content-box;
+  }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .row-label { font-size: 13px; color: var(--muted); }
+  .btn {
+    padding: 9px 18px; border: none; border-radius: 6px; cursor: pointer;
+    font-size: 14px; font-family: inherit; color: #fff;
+  }
+  .btn-save { background: var(--accent); }
+  .btn-cancel { background: #7f8c8d; }
+  .btn-date { background: #2f80ed; margin-bottom: 10px; }
+  .actions { display: flex; gap: 8px; }
+  .hint { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .file-status {
+    display: flex; justify-content: space-between; font-size: 12px; color: var(--muted);
+    border-top: 1px dashed var(--border); padding-top: 8px; margin-bottom: 10px;
+  }
+
+  .folder-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; max-height: 300px; overflow-y: auto; }
+  .folder-choice {
+    display: flex; align-items: center; gap: 10px; padding: 12px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+    color: var(--text); cursor: pointer; font-family: inherit; font-size: 15px; text-align: right;
+  }
+  .folder-choice:hover { border-color: var(--accent); }
+  .new-folder-row { display: flex; gap: 8px; }
+  .new-folder-row input { margin-bottom: 0; }
+
+  .menu-btn {
+    width: 100%; padding: 12px; border: none; border-radius: 8px;
+    cursor: pointer; font-family: inherit; font-size: 15px; color: #fff; margin-bottom: 8px;
+  }
+  .menu-download { background: var(--accent); }
+  .menu-share { background: #2f80ed; }
+  .menu-rename { background: #8e6cd6; }
+  .menu-delete { background: #c0392b; }
+  .menu-cancel { background: #7f8c8d; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📂 ملفات الملاحظات</h1>
+
+  <div class="toolbar">
+    <span class="tool-label">الثيم:</span>
+    <select class="theme-select" id="themeSelect" onchange="setTheme(this.value)">
+      <option value="light">فاتح</option>
+      <option value="dark">داكن</option>
+      <option value="sepia">بيج</option>
+      <option value="blue">أزرق</option>
+    </select>
+    <button class="tool-btn" id="selectBtn" onclick="toggleSelectMode()">☑️ تحديد ملاحظات</button>
+  </div>
+
+  <div class="crumb" id="crumb"></div>
+  <input type="text" class="search-box" id="searchInput" placeholder="🔍 ابحث في كل الملاحظات..." oninput="renderNotes()">
+  <div class="grid" id="notesGrid"></div>
+</div>
+
+<button class="fab" id="fab" onclick="openModal()" title="ملاحظة جديدة">+</button>
+
+<!-- شريط الإجراءات عند التحديد -->
+<div class="action-bar" id="actionBar">
+  <span class="action-count" id="actionCount">0 محددة</span>
+  <button class="tool-btn" onclick="openMovePicker()">📁 نقل إلى مجلد</button>
+  <button class="tool-btn" style="background:#c0392b" onclick="deleteSelected()">🗑️ حذف</button>
+  <button class="tool-btn" style="background:#7f8c8d" onclick="toggleSelectMode()">إنهاء</button>
+</div>
+
+<!-- نافذة الملاحظة -->
+<div class="overlay" id="overlay" onclick="if(event.target===this) closeModal()">
+  <div class="modal">
+    <div class="file-header">
+      <span class="file-header-icon">📄</span>
+      <span id="modalTitle">ملاحظة جديدة</span>
+    </div>
+    <input type="text" id="titleInput" placeholder="عنوان الملاحظة (اسم الملف)">
+    <div class="row">
+      <span class="row-label">نمط الورقة:</span>
+      <select class="theme-select" id="paperSelect" onchange="choosePaper(this.value)"></select>
+      <span class="row-label">المجلد:</span>
+      <select class="theme-select" id="folderSelect"></select>
+    </div>
+    <textarea id="bodyInput" placeholder="اكتب ملاحظتك هنا..." oninput="updateStatus()"></textarea>
+    <button type="button" class="btn btn-date" onclick="insertDateTime()">📅 إدراج التاريخ والوقت</button>
+    <div class="file-status"><span id="fileStatus">0 كلمة · 0 حرف</span><span>.txt</span></div>
+    <div class="hint">تُحفظ الملاحظة داخل البرنامج وتبقى بعد إغلاق الصفحة.</div>
+    <div class="actions">
+      <button class="btn btn-save" onclick="saveNote()">حفظ</button>
+      <button class="btn btn-cancel" onclick="closeModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- اختيار المجلد لنقل الملاحظات المحددة -->
+<div class="overlay" id="moveOverlay" onclick="if(event.target===this) closeMovePicker()">
+  <div class="modal">
+    <div class="file-header"><span class="file-header-icon">📁</span><span>نقل الملاحظات إلى مجلد</span></div>
+    <div class="folder-list" id="moveList"></div>
+    <div class="new-folder-row">
+      <input type="text" id="moveNewFolder" placeholder="اسم مجلد جديد">
+      <button class="btn btn-save" onclick="moveToNewFolder()">إنشاء ونقل</button>
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button class="btn btn-cancel" onclick="closeMovePicker()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- إنشاء مجلد جديد -->
+<div class="overlay" id="newFolderOverlay" onclick="if(event.target===this) closeNewFolder()">
+  <div class="modal" style="max-width:380px">
+    <div class="file-header"><span class="file-header-icon">📁</span><span>مجلد جديد</span></div>
+    <input type="text" id="newFolderName" placeholder="اسم المجلد">
+    <div class="actions">
+      <button class="btn btn-save" onclick="createFolderFromDialog()">إنشاء</button>
+      <button class="btn btn-cancel" onclick="closeNewFolder()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- قائمة الملاحظة (الضغط المطوّل) -->
+<div class="overlay" id="fileMenu" onclick="if(event.target===this) closeFileMenu()">
+  <div class="modal" style="max-width: 320px;">
+    <div class="file-header"><span class="file-header-icon">📄</span><span id="fileMenuTitle">الملف</span></div>
+    <button class="menu-btn menu-download" onclick="downloadNoteImage()">⬇️ تنزيل بصيغة صورة</button>
+    <button class="menu-btn menu-share" onclick="shareNoteImage()">🔗 مشاركة بصيغة صورة</button>
+    <button class="menu-btn menu-delete" onclick="deleteFromMenu()">🗑️ مسح</button>
+    <button class="menu-btn menu-cancel" onclick="closeFileMenu()">إلغاء</button>
+  </div>
+</div>
+
+<!-- قائمة المجلد (الضغط المطوّل) -->
+<div class="overlay" id="folderMenu" onclick="if(event.target===this) closeFolderMenu()">
+  <div class="modal" style="max-width: 320px;">
+    <div class="file-header"><span class="file-header-icon">📁</span><span id="folderMenuTitle">المجلد</span></div>
+    <button class="menu-btn menu-rename" onclick="renameFromMenu()">✏️ تغيير الاسم</button>
+    <button class="menu-btn menu-delete" onclick="deleteFolderFromMenu()">🗑️ حذف المجلد</button>
+    <button class="menu-btn menu-cancel" onclick="closeFolderMenu()">إلغاء</button>
+  </div>
+</div>
+
+<script>
+  const NOTES_KEY = "notes-app-files";
+  const FOLDERS_KEY = "notes-app-folders";
+  const PREFS_KEY = "notes-app-prefs";
+  const PAPERS = [
+    { id: "plain", label: "بيضاء" },
+    { id: "lined", label: "أسطر" },
+    { id: "grid", label: "مربعات" },
+    { id: "dotted", label: "نقاط" }
+  ];
+  const DEFAULT_PAPER = "plain";
+
+  function loadJSON(key, fallback) {
+    try {
+      const d = localStorage.getItem(key);
+      return d ? JSON.parse(d) : fallback;
+    } catch (e) { return fallback; }
+  }
+  function saveJSON(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); }
+    catch (e) { alert("تعذّر الحفظ في المتصفح"); }
+  }
+
+  let prefs = Object.assign({ theme: "light" }, loadJSON(PREFS_KEY, {}));
+  let notes = loadJSON(NOTES_KEY, []);
+  let folders = loadJSON(FOLDERS_KEY, []);
+  let nextId = notes.reduce((max, n) => Math.max(max, n.id), 0) + 1;
+  let currentFolder = null;
+  let editingId = null;
+  let selectedPaper = DEFAULT_PAPER;
+  let fileMenuId = null;
+  let folderMenuId = null;
+  let pressTimer = null;
+  let longPressed = false;
+  let selectMode = false;
+  let selected = new Set();
+
+  // ===== التنقل بزر الرجوع =====
+  let overlayOpen = false;
+  const OVERLAY_IDS = ["overlay", "fileMenu", "folderMenu", "moveOverlay", "newFolderOverlay"];
+
+  function hideAllOverlays() {
+    OVERLAY_IDS.forEach(id => document.getElementById(id).classList.remove("show"));
+  }
+
+  function showOverlay(id) {
+    if (!overlayOpen) {
+      history.pushState({ folder: currentFolder, overlay: true }, "");
+      overlayOpen = true;
+    }
+    document.getElementById(id).classList.add("show");
+  }
+
+  function closeOverlays() {
+    if (overlayOpen) history.back();
+    else hideAllOverlays();
+  }
+
+  window.addEventListener("popstate", e => {
+    hideAllOverlays();
+    overlayOpen = false;
+    currentFolder = e.state && e.state.folder !== undefined ? e.state.folder : null;
+    renderNotes();
+  });
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text || "";
+    return div.innerHTML;
+  }
+
+  function paperOf(n) { return n.paper || DEFAULT_PAPER; }
+  function folderOf(n) { return n.folderId ?? null; }
+  function newFolderId() {
+    return Math.max(Date.now(), ...folders.map(f => f.id + 1));
+  }
+
+  // ===== الثيم =====
+  function applyTheme() {
+    document.documentElement.setAttribute("data-theme", prefs.theme);
+    document.getElementById("themeSelect").value = prefs.theme;
+  }
+  function setTheme(theme) {
+    prefs.theme = theme;
+    saveJSON(PREFS_KEY, prefs);
+    applyTheme();
+  }
+
+  // ===== التحديد المتعدد =====
+  function toggleSelectMode() {
+    selectMode = !selectMode;
+    selected.clear();
+    document.getElementById("selectBtn").classList.toggle("active", selectMode);
+    document.getElementById("selectBtn").textContent = selectMode ? "✖ إلغاء التحديد" : "☑️ تحديد ملاحظات";
+    document.getElementById("fab").classList.toggle("hidden", selectMode);
+    renderNotes();
+  }
+
+  function toggleSelect(id) {
+    if (selected.has(id)) selected.delete(id);
+    else selected.add(id);
+    renderNotes();
+  }
+
+  function updateActionBar() {
+    const bar = document.getElementById("actionBar");
+    bar.classList.toggle("show", selectMode && selected.size > 0);
+    document.getElementById("actionCount").textContent = `${selected.size} محددة`;
+  }
+
+  function deleteSelected() {
+    if (selected.size === 0) return;
+    if (!confirm(`حذف ${selected.size} ملاحظة نهائياً؟`)) return;
+    notes = notes.filter(n => !selected.has(n.id));
+    saveJSON(NOTES_KEY, notes);
+    selected.clear();
+    renderNotes();
+  }
+
+  // ===== نقل الملاحظات إلى مجلد =====
+  function openMovePicker() {
+    if (selected.size === 0) return;
+    const list = document.getElementById("moveList");
+    list.innerHTML =
+      `<button class="folder-choice" onclick="moveSelectedTo(null)">🏠 الرئيسية (بدون مجلد)</button>` +
+      folders.map(f =>
+        `<button class="folder-choice" onclick="moveSelectedTo(${f.id})">📁 ${escapeHtml(f.name)}
+          <span style="margin-right:auto;color:var(--muted);font-size:12px">${notes.filter(n => folderOf(n) === f.id).length} ملاحظة</span></button>`
+      ).join("");
+    document.getElementById("moveNewFolder").value = "";
+    showOverlay("moveOverlay");
+  }
+
+  function closeMovePicker() {
+    closeOverlays();
+  }
+
+  function moveSelectedTo(folderId) {
+    notes.forEach(n => { if (selected.has(n.id)) n.folderId = folderId; });
+    saveJSON(NOTES_KEY, notes);
+    closeMovePicker();
+    selected.clear();
+    toggleSelectMode();
+  }
+
+  function moveToNewFolder() {
+    const name = document.getElementById("moveNewFolder").value.trim();
+    if (!name) return;
+    const id = newFolderId();
+    folders.push({ id, name });
+    saveJSON(FOLDERS_KEY, folders);
+    moveSelectedTo(id);
+  }
+
+  // ===== إنشاء المجلدات =====
+  function openNewFolder() {
+    document.getElementById("newFolderName").value = "";
+    showOverlay("newFolderOverlay");
+    document.getElementById("newFolderName").focus();
+  }
+  function closeNewFolder() {
+    closeOverlays();
+  }
+  function createFolderFromDialog() {
+    const name = document.getElementById("newFolderName").value.trim();
+    if (!name) return;
+    folders.push({ id: newFolderId(), name });
+    saveJSON(FOLDERS_KEY, folders);
+    closeNewFolder();
+    renderNotes();
+  }
+
+  function openFolder(id) {
+    currentFolder = id;
+    history.pushState({ folder: id }, "");
+    renderNotes();
+  }
+  function goRoot() {
+    currentFolder = null;
+    history.pushState({ folder: null }, "");
+    renderNotes();
+  }
+
+  function renameFolder(id) {
+    const f = folders.find(x => x.id === id);
+    if (!f) return;
+    const name = prompt("اسم المجلد:", f.name);
+    if (!name || !name.trim()) return;
+    f.name = name.trim();
+    saveJSON(FOLDERS_KEY, folders);
+    renderNotes();
+  }
+
+  function deleteFolder(id) {
+    if (!confirm("حذف المجلد؟ ستنتقل ملاحظاته إلى الرئيسية.")) return;
+    notes.forEach(n => { if (folderOf(n) === id) n.folderId = null; });
+    folders = folders.filter(f => f.id !== id);
+    saveJSON(NOTES_KEY, notes);
+    saveJSON(FOLDERS_KEY, folders);
+    if (currentFolder === id) currentFolder = null;
+    renderNotes();
+  }
+
+  // ===== نافذة الملاحظة =====
+  function renderPaperOptions() {
+    document.getElementById("paperSelect").innerHTML = PAPERS.map(p =>
+      `<option value="${p.id}" ${p.id === selectedPaper ? "selected" : ""}>${p.label}</option>`
+    ).join("");
+  }
+
+  function renderFolderOptions(selectedFolder) {
+    document.getElementById("folderSelect").innerHTML =
+      `<option value="" ${selectedFolder === null ? "selected" : ""}>الرئيسية (بدون مجلد)</option>` +
+      folders.map(f =>
+        `<option value="${f.id}" ${f.id === selectedFolder ? "selected" : ""}>${escapeHtml(f.name)}</option>`
+      ).join("");
+  }
+
+  function choosePaper(paper) {
+    selectedPaper = paper;
+    applyModalPaper();
+  }
+
+  function applyModalPaper() {
+    const area = document.getElementById("bodyInput");
+    PAPERS.forEach(p => area.classList.remove("paper-" + p.id));
+    area.classList.add("paper-" + selectedPaper);
+    renderPaperOptions();
+  }
+
+  function updateStatus() {
+    const v = document.getElementById("bodyInput").value;
+    const words = v.trim() ? v.trim().split(/\s+/).length : 0;
+    const bytes = new Blob([v]).size;
+    document.getElementById("fileStatus").textContent =
+      `${words} كلمة · ${v.length} حرف · ${bytes} بايت`;
+  }
+
+  function openModal(id = null) {
+    editingId = id;
+    const note = id !== null ? notes.find(n => n.id === id) : null;
+    document.getElementById("modalTitle").textContent = note ? "تعديل الملاحظة" : "ملاحظة جديدة";
+    document.getElementById("titleInput").value = note ? note.title : "";
+    document.getElementById("bodyInput").value = note ? note.body : "";
+    selectedPaper = note ? paperOf(note) : DEFAULT_PAPER;
+    renderFolderOptions(note ? folderOf(note) : currentFolder);
+    applyModalPaper();
+    updateStatus();
+    showOverlay("overlay");
+    document.getElementById("titleInput").focus();
+  }
+
+  function closeModal() {
+    editingId = null;
+    closeOverlays();
+  }
+
+  function saveNote() {
+    const title = document.getElementById("titleInput").value.trim();
+    const body = document.getElementById("bodyInput").value.trim();
+    const fv = document.getElementById("folderSelect").value;
+    const folderId = fv === "" ? null : Number(fv);
+
+    if (!title && !body) {
+      alert("الرجاء كتابة عنوان أو محتوى للملاحظة");
+      return;
+    }
+
+    const now = new Date().toLocaleString("ar-EG");
+
+    if (editingId !== null) {
+      const note = notes.find(n => n.id === editingId);
+      if (note) {
+        note.title = title || "ملاحظة-" + note.id;
+        note.body = body;
+        note.paper = selectedPaper;
+        note.folderId = folderId;
+        note.date = now + " (معدّلة)";
+      }
+    } else {
+      notes.unshift({ id: nextId++, title: title || "ملاحظة", body, paper: selectedPaper, folderId, date: now });
+    }
+
+    saveJSON(NOTES_KEY, notes);
+    closeModal();
+    renderNotes();
+  }
+
+  function deleteNoteQuick(id, event) {
+    event.stopPropagation();
+    if (!confirm("حذف هذه الملاحظة نهائياً؟")) return;
+    notes = notes.filter(n => n.id !== id);
+    selected.delete(id);
+    saveJSON(NOTES_KEY, notes);
+    renderNotes();
+  }
+
+  // ===== قوائم الضغط المطوّل =====
+  function openFileMenu(id) {
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+    fileMenuId = id;
+    document.getElementById("fileMenuTitle").textContent = (note.title || "ملاحظة") + ".txt";
+    showOverlay("fileMenu");
+  }
+  function closeFileMenu() {
+    fileMenuId = null;
+    closeOverlays();
+  }
+  function deleteFromMenu() {
+    const id = fileMenuId;
+    closeFileMenu();
+    if (id === null) return;
+    if (!confirm("مسح هذه الملاحظة نهائياً؟")) return;
+    notes = notes.filter(n => n.id !== id);
+    saveJSON(NOTES_KEY, notes);
+    renderNotes();
+  }
+
+  function openFolderMenu(id) {
+    const f = folders.find(x => x.id === id);
+    if (!f) return;
+    folderMenuId = id;
+    document.getElementById("folderMenuTitle").textContent = f.name;
+    showOverlay("folderMenu");
+  }
+  function closeFolderMenu() {
+    folderMenuId = null;
+    closeOverlays();
+  }
+  function renameFromMenu() {
+    const id = folderMenuId;
+    closeFolderMenu();
+    if (id !== null) renameFolder(id);
+  }
+  function deleteFolderFromMenu() {
+    const id = folderMenuId;
+    closeFolderMenu();
+    if (id !== null) deleteFolder(id);
+  }
+
+  // ===== النقر والضغط المطوّل =====
+  function cardClick(kind, id) {
+    if (longPressed) { longPressed = false; return; }
+    if (kind === "folder") { openFolder(id); return; }
+    if (selectMode) { toggleSelect(id); return; }
+    openModal(id);
+  }
+
+  const gridEl = document.getElementById("notesGrid");
+  gridEl.addEventListener("pointerdown", e => {
+    const card = e.target.closest(".file-card");
+    if (!card || e.target.closest(".file-delete")) return;
+    longPressed = false;
+    const kind = card.dataset.kind;
+    const id = Number(card.dataset.id);
+    clearTimeout(pressTimer);
+    if (selectMode) return;
+    pressTimer = setTimeout(() => {
+      longPressed = true;
+      if (navigator.vibrate) navigator.vibrate(30);
+      if (kind === "folder") openFolderMenu(id);
+      else openFileMenu(id);
+    }, 500);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(evt =>
+    gridEl.addEventListener(evt, () => clearTimeout(pressTimer)));
+  gridEl.addEventListener("contextmenu", e => {
+    if (e.target.closest(".file-card")) e.preventDefault();
+  });
+
+  // ===== الأيقونات =====
+  const NOTE_ICON = `
+    <svg viewBox="0 0 48 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6 6h36a3 3 0 0 1 3 3v40a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3z" fill="currentColor" fill-opacity="0.45"/>
+      <path d="M4 12h40v38H4z" fill="currentColor"/>
+      <circle cx="14" cy="9" r="2.2" stroke="currentColor" stroke-width="2"/>
+      <circle cx="24" cy="9" r="2.2" stroke="currentColor" stroke-width="2"/>
+      <circle cx="34" cy="9" r="2.2" stroke="currentColor" stroke-width="2"/>
+      <path d="M10 22h28M10 29h28M10 36h20" stroke="rgba(255,255,255,0.6)" stroke-width="2" stroke-linecap="round"/>
+    </svg>`;
+  const FOLDER_ICON = `
+    <svg viewBox="0 0 48 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 8a3 3 0 0 1 3-3h12l4 4h22a3 3 0 0 1 3 3v24a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3z" fill="currentColor" fill-opacity="0.45"/>
+      <path d="M2 16h44v21a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3z" fill="currentColor"/>
+    </svg>`;
+
+  // ===== العرض =====
+  function noteCard(n, showFolder) {
+    const folder = showFolder && folderOf(n) !== null
+      ? folders.find(f => f.id === folderOf(n))
+      : null;
+    const isSel = selected.has(n.id);
+    return `
+      <div class="file-card paper-${paperOf(n)} ${isSel ? "selected" : ""}" data-kind="note" data-id="${n.id}" onclick="cardClick('note', ${n.id})">
+        <div class="check">✓</div>
+        <button class="file-delete" onclick="deleteNoteQuick(${n.id}, event)" title="حذف">✖</button>
+        <div class="file-icon">${NOTE_ICON}</div>
+        <div class="file-name">${escapeHtml(n.title)}.txt</div>
+        <div class="file-preview">${escapeHtml(n.body)}</div>
+        <div class="file-date">${folder ? "📁 " + escapeHtml(folder.name) + " · " : ""}${escapeHtml(n.date)}</div>
+      </div>`;
+  }
+
+  function folderCard(f) {
+    const count = notes.filter(n => folderOf(n) === f.id).length;
+    return `
+      <div class="file-card" data-kind="folder" data-id="${f.id}" onclick="cardClick('folder', ${f.id})">
+        <div class="file-icon folder-icon">${FOLDER_ICON}</div>
+        <div class="file-name">${escapeHtml(f.name)}</div>
+        <div class="file-date">${count} ملاحظة</div>
+      </div>`;
+  }
+
+  function renderCrumb(query) {
+    const crumb = document.getElementById("crumb");
+    if (query) {
+      crumb.innerHTML = "<span>نتائج البحث في كل الملاحظات</span>";
+      return;
+    }
+    if (currentFolder === null) {
+      crumb.innerHTML = "<strong>الرئيسية</strong>";
+    } else {
+      const f = folders.find(x => x.id === currentFolder);
+      crumb.innerHTML = `<button class="chip" onclick="goRoot()">⬅️ الرئيسية</button>
+        <span>/</span><strong>📁 ${escapeHtml(f ? f.name : "")}</strong>`;
+    }
+  }
+
+  function renderNotes() {
+    const query = document.getElementById("searchInput").value.trim();
+    renderCrumb(query);
+
+    let html = "";
+    if (query) {
+      const results = notes.filter(n => n.title.includes(query) || n.body.includes(query));
+      html = results.map(n => noteCard(n, true)).join("");
+      if (!html) html = '<div class="empty">لا توجد نتائج مطابقة للبحث.</div>';
+    } else {
+      const folderHtml = currentFolder === null ? folders.map(folderCard).join("") : "";
+      const noteHtml = notes
+        .filter(n => folderOf(n) === currentFolder)
+        .map(n => noteCard(n, false)).join("");
+      html = folderHtml + noteHtml;
+      if (!html) {
+        html = currentFolder === null
+          ? '<div class="empty">لا توجد ملفات بعد. اضغط زر + لإضافة ملاحظة، أو أنشئ مجلداً.</div>'
+          : '<div class="empty">هذا المجلد فارغ. أضف ملاحظات إليه بالتحديد ثم النقل.</div>';
+      }
+    }
+    gridEl.innerHTML = html;
+    updateActionBar();
+  }
+
+  // ===== إدراج التاريخ والوقت =====
+  function insertDateTime() {
+    const area = document.getElementById("bodyInput");
+    const now = new Date();
+    const date = now.toLocaleDateString("ar-EG", { weekday: "long", year: "numeric", month: "numeric", day: "numeric" });
+    const time = now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+    const text = `[${date} - ${time}]`;
+    const start = area.selectionStart ?? area.value.length;
+    const end = area.selectionEnd ?? area.value.length;
+    area.value = area.value.slice(0, start) + text + area.value.slice(end);
+    const pos = start + text.length;
+    area.focus();
+    area.setSelectionRange(pos, pos);
+    updateStatus();
+  }
+
+  // ===== تحويل الملاحظة إلى صورة =====
+  function drawNoteCanvas(note) {
+    const W = 600, pad = 28, lineH = 28, headerH = 70;
+    const measure = document.createElement("canvas").getContext("2d");
+    measure.font = '18px "Segoe UI", Tahoma, Arial';
+    const maxW = W - pad * 2;
+    const lines = [];
+
+    (note.body || "").split("\n").forEach(par => {
+      if (!par.trim()) { lines.push(""); return; }
+      let cur = "";
+      par.split(" ").forEach(word => {
+        const test = cur ? cur + " " + word : word;
+        if (measure.measureText(test).width > maxW && cur) {
+          lines.push(cur);
+          cur = word;
+        } else {
+          cur = test;
+        }
+      });
+      lines.push(cur);
+    });
+
+    const H = Math.max(260, headerH + lines.length * lineH + pad);
+    const c = document.createElement("canvas");
+    c.width = W;
+    c.height = H;
+    const ctx = c.getContext("2d");
+    const paper = paperOf(note);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, W, H);
+
+    if (paper === "lined") {
+      ctx.strokeStyle = "#b9c7d8";
+      ctx.lineWidth = 1;
+      for (let y = headerH + lineH; y <= H; y += lineH) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+    } else if (paper === "grid") {
+      ctx.strokeStyle = "#c9d3df";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= W; x += 24) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      }
+      for (let y = 0; y <= H; y += 24) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+    } else if (paper === "dotted") {
+      ctx.fillStyle = "#b5b5b5";
+      for (let x = 10; x < W; x += 20) {
+        for (let y = 10; y < H; y += 20) {
+          ctx.beginPath(); ctx.arc(x, y, 1.2, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+
+    ctx.direction = "rtl";
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#2c3e50";
+    ctx.font = 'bold 22px "Segoe UI", Tahoma, Arial';
+    ctx.fillText(note.title || "ملاحظة", W - pad, pad + 18);
+
+    ctx.fillStyle = "#222222";
+    ctx.font = '18px "Segoe UI", Tahoma, Arial';
+    lines.forEach((line, i) => {
+      ctx.fillText(line, W - pad, headerH + (i + 1) * lineH - 8);
+    });
+    return c;
+  }
+
+  function safeName(text) {
+    return (text || "ملاحظة").replace(/[\\/:*?"<>|]/g, "-").trim() || "ملاحظة";
+  }
+
+  function downloadNoteImage() {
+    const note = notes.find(n => n.id === fileMenuId);
+    closeFileMenu();
+    if (!note) return;
+    drawNoteCanvas(note).toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = safeName(note.title) + ".png";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }, "image/png");
+  }
+
+  function shareNoteImage() {
+    const note = notes.find(n => n.id === fileMenuId);
+    closeFileMenu();
+    if (!note) return;
+    drawNoteCanvas(note).toBlob(blob => {
+      const file = new File([blob], safeName(note.title) + ".png", { type: "image/png" });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: note.title }).catch(() => {});
+      } else {
+        alert("المشاركة غير مدعومة في هذا المتصفح، استخدم التنزيل بدلاً منها.");
+      }
+    }, "image/png");
+  }
+
+  history.replaceState({ folder: null }, "");
+  applyTheme();
+  renderNotes();
+</script>
+</body>
+</html>
